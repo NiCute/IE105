@@ -1,0 +1,37 @@
+============================================================
+           KẾT QUẢ PHÂN TÍCH AN TOÀN & MÃ ĐỘC
+============================================================
+ Tổng số mẫu phân tích : 1,729 mẫu
+ Tổng số MÃ ĐỘC        : 1,474 mẫu ( 85.3%)
+ Tổng số MÃ AN TOÀN    : 255 mẫu ( 14.7%)
+------------------------------------------------------------
+ CHI TIẾT TỪNG LOẠI DỰ ĐOÁN:
+  [!] Adware             (Mã độc):   278 mẫu ( 16.1%)
+  [!] Banking            (Mã độc):   295 mẫu ( 17.1%)
+  [!] SMS Malware        (Mã độc):   588 mẫu ( 34.0%)
+  [!] Riskware           (Mã độc):   313 mẫu ( 18.1%)
+  [OK] Benign             (Mã an toàn):   255 mẫu ( 14.7%)
+============================================================
+
+IE105 — Chi tiết Metrics đánh giá:
+=================================================================
+Nguồn dữ liệu     : images_22x22.npz
+Tổng số mẫu       : 1,729
+Accuracy          : 90.9774%
+Macro Precision   : 0.8930
+Macro Recall      : 0.9046
+Macro F1-Score    : 0.8910
+Weighted F1-Score : 0.9128
+Macro ROC-AUC     : 0.9914
+
+              precision    recall  f1-score   support
+
+      Adware     0.6475    0.9574    0.7725       188
+     Banking     0.9424    0.9055    0.9236       307
+ SMS Malware     0.9762    0.9812    0.9787       585
+    Riskware     0.9776    0.8053    0.8831       380
+      Benign     0.9216    0.8736    0.8969       269
+
+    accuracy                         0.9098      1729
+   macro avg     0.8930    0.9046    0.8910      1729
+weighted avg     0.9263    0.9098    0.9128      1729
