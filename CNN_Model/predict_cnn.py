@@ -25,9 +25,17 @@ import torch
 import torch.nn.functional as F
 from sklearn.metrics import accuracy_score, classification_report, f1_score
 
-from cnn_train import HybridMalwareModel, CLASS_NAMES
-
 BASE_DIR = Path(__file__).parent.resolve()
+if str(BASE_DIR) not in sys.path:
+    sys.path.insert(0, str(BASE_DIR))
+if str(BASE_DIR.parent) not in sys.path:
+    sys.path.append(str(BASE_DIR.parent))
+
+try:
+    from cnn_train import HybridMalwareModel, CLASS_NAMES
+except ImportError:
+    from CNN_Model.cnn_train import HybridMalwareModel, CLASS_NAMES
+
 MODEL_PATH = BASE_DIR / "cnn_best_model.pth"
 PIPELINE_PATH = BASE_DIR / "cnn_pipeline.joblib"
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
