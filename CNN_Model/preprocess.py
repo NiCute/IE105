@@ -29,14 +29,42 @@ SEMANTIC_GROUPS_ORDER = [
 # keyword để phân nhóm, cái này mình tự ngồi đọc tên cột rồi liệt kê ra
 # chắc chắn chưa đầy đủ, nhóm Other_API vẫn còn khá nhiều
 SEMANTIC_KEYWORDS = {
-    "Network": ["NETWORK", "SOCKET", "HTTP", "URL", "INET", "DNS", "CONNECT", "BIND", "ACCEPT", "DHCP", "MOBILE_IFACE", "GETDATASTATE", "GETMOBILEDATA"],
-    "Privacy": ["PERMISSION", "ACCESS_PERSONAL", "ACCOUNT", "CONTACT", "LOCATION", "CAMERA", "MIC", "LINE1NUMBER", "ICCSERIAL", "IMEI", "IMSI", "GEOC"],
-    "Crypto": ["CRYPTO", "CIPHER", "ENCRYPT", "HASH", "SIGN", "KEY", "SSL", "TLS", "SECRET"],
-    "Process": ["PROCESS", "THREAD", "EXECUTE", "FORK", "SPAWN", "SCHED", "CLOCK", "EXIT", "KILL", "TERMINATE", "ANTI_DEBUG", "CLONE", "EXECVE", "CAPSET", "FUTEX", "EVENTFD", "CREATE_THREAD", "CREATE_PROCESS"],
-    "Device": ["DEVICE", "PHONE", "SMS", "CALL", "AUDIO", "DISPLAY", "SENSOR", "BATTERY", "GPS", "WIFI", "BLUETOOTH", "VIBRAT", "FLASHLIGHT", "CELLINFO", "NEIGHBORINGCELL", "ALTER_PHONE"],
-    "Android_Component": ["INTENT", "BROADCAST", "RECEIVER", "SERVICE", "ACTIVITY", "CONTENT", "PROVIDER", "REGISTER", "UNREGIST", "NOTIFICATION", "TOAST", "SYNC", "PANEL"],
-    "App_Management": ["PACKAGE", "INSTALL", "APP", "APK", "CLASSLOAD", "REFLECT", "PKGUSAGE", "COMPONENT_ENABLED", "GETCOMPONENT"],
-    "FileSystem": ["FS_ACCESS", "FS_PIPE", "CREATE_FOLDER", "FTRUNCATE", "INOTIFY", "EPOLL", "CHMOD", "MMAP", "_LLSEEK", "FDATASYNC", "FSTAT", "FSTATFS", "FSYNC", "FLOCK", "FCNTL", "CHDIR", "CHOWN", "FACCESSAT", "FCHOWN", "ACCESS"],
+    "Network": [
+        "NETWORK", "SOCKET", "HTTP", "URL", "INET", "DNS", "CONNECT", "DISCONNECT",
+        "BIND", "ACCEPT", "DHCP", "MOBILE", "IFACE", "DATASTATE", "MOBILEDATA", "NET", "TRAFFIC"
+    ],
+    "Privacy": [
+        "PERMISSION", "PERMISSIONS", "ACCOUNT", "ACCOUNTS", "CONTACT", "CONTACTS",
+        "LOCATION", "CAMERA", "MIC", "LINE1NUMBER", "ICCSERIAL", "IMEI", "IMSI", 
+        "GEOC", "GEOCODER", "PERSONAL", "LATITUDE", "LONGITUDE"
+    ],
+    "Crypto": [
+        "CRYPTO", "CIPHER", "ENCRYPT", "ENCRYPTION", "DECRYPT", "HASH", "SIGN", 
+        "SIGNATURE", "SIGNATURES", "KEY", "KEYS", "KEYGUARD", "SSL", "TLS", 
+        "SECRET", "AUTHENTICATOR", "CERTIFICATE"
+    ],
+    "Process": [
+        "PROCESS", "THREAD", "EXECUTE", "FORK", "SPAWN", "SCHED", "CLOCK", "EXIT", 
+        "KILL", "TERMINATE", "ANTI", "DEBUG", "CLONE", "EXECVE", "CAPSET", "FUTEX", "EVENTFD"
+    ],
+    "Device": [
+        "DEVICE", "PHONE", "SMS", "CALL", "AUDIO", "DISPLAY", "SENSOR", "BATTERY", 
+        "GPS", "WIFI", "BLUETOOTH", "VIBRAT", "VIBRATE", "FLASHLIGHT", "CELLINFO", "CELL", "POWER"
+    ],
+    "Android_Component": [
+        "INTENT", "BROADCAST", "RECEIVER", "SERVICE", "ACTIVITY", "CONTENT", 
+        "PROVIDER", "REGISTER", "UNREGISTER", "NOTIFICATION", "NOTIFICATIONS", 
+        "TOAST", "SYNC", "PANEL", "PANELS", "WINDOW"
+    ],
+    "App_Management": [
+        "PACKAGE", "PACKAGES", "INSTALL", "APP", "APK", "CLASSLOAD", "REFLECT", 
+        "PKGUSAGE", "COMPONENT", "COMPONENTS", "DEX", "RESTORE", "ADMIN", "ADMINS"
+    ],
+    "FileSystem": [
+        "FS", "FILE", "FOLDER", "PIPE", "FTRUNCATE", "INOTIFY", "EPOLL", "CHMOD", 
+        "MMAP", "SEEK", "FDATASYNC", "FSTAT", "FSYNC", "FLOCK", "FCNTL", "CHDIR", 
+        "CHOWN", "ACCESS", "STORAGE"
+    ],
 }
 
 # trước dùng 22x22 nhưng khi căn hàng theo nhóm thì không đủ chỗ nên tăng lên 24x24
@@ -76,9 +104,14 @@ class FeatureToImagePipeline:
         if col_name in self.syscall_set:
             return "SystemCall"
 
-        # tách tên cột theo ký tự đặc biệt rồi mới so keyword
-        # lúc đầu dùng `kw in col_name` thì bị lỗi kiểu APPEND cũng dính vào nhóm APP
-        tokens = set(re.split(r'[^A-Z0-9]+', col_name.upper()))
+        # 1. Tách camelCase và PascalCase trước khi chuyển thành chữ hoa
+        s = re.sub(r'([a-z0-9])([A-Z])', r'\1_\2', col_name)
+        s = re.sub(r'([A-Z]+)([A-Z][a-z])', r'\1_\2', s)
+
+        # 2. Tách theo ký tự đặc biệt (_, ., (), `, ...) và đưa về chữ hoa
+        tokens = set(re.split(r'[^A-Za-z0-9]+', s.upper()))
+
+        # 3. Đối chiếu từ khóa
         for group, keywords in SEMANTIC_KEYWORDS.items():
             for kw in keywords:
                 if kw in tokens:
