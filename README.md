@@ -1,139 +1,148 @@
-# 🛡️ Phân Loại và Phát Hiện Mã Độc Android Bằng Mạng Nơ-ron Tích Chập (MalwareCNN)
-## Android Malware Detection & Classification using 2D-CNN and Tabular Boosting
+# Đồ án IE105 - Khai phá dữ liệu & Ứng dụng
+**Phát hiện và Phân loại Mã độc Android bằng Kỹ thuật Deep Learning (Kiến trúc Hybrid)**
 
-[![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
-[![PyTorch](https://img.shields.io/badge/PyTorch-2.x-EE4C2C.svg)](https://pytorch.org/)
-[![Scikit-Learn](https://img.shields.io/badge/Scikit--Learn-1.3%2B-F7931E.svg)](https://scikit-learn.org/)
-[![Topic: Deep Learning](https://img.shields.io/badge/Domain-Deep%20Learning%20%26%20Cybersecurity-red.svg)](https://github.com/)
-
-> **Chuyên ngành:** An toàn Thông tin & Học sâu (Deep Learning in Cybersecurity)  
-> **Bộ dữ liệu chuẩn:** CICMalDroid2020 (11,526 mẫu hành vi động sau tiền xử lý)  
-> **Trọng tâm đề tài:** 
-> 1. **Mô hình chính (Deep Learning):** Biểu diễn vân tay mã độc thành ảnh 2D ($22\times22$) với **vùng ưu tiên 139 Linux Kernel System Calls** và mạng **MalwareCNN (PyTorch)** (Đạt **90.98% Accuracy, Macro F1 89.10%, ROC-AUC 0.9914**).
-> 2. **Mô hình đối chuẩn (Tabular Benchmark):** Mô hình cây **HistGradientBoosting** kết hợp 4 nhóm đặc trưng cấp cao (Đạt **95.66% Accuracy, Macro F1 94.75%**).
+Chào mừng đến với dự án cuối kỳ môn Khai phá dữ liệu (IE105). Repo này chứa mã nguồn để phát hiện và phân loại mã độc Android dựa trên các hành vi (lời gọi hệ thống Linux, API calls, quyền hạn, intent, phần cứng...) được trích xuất từ môi trường sandbox động (bộ dữ liệu CICMalDroid2020).
 
 ---
 
-## 💡 1. Ý Tưởng & Đột Phá Kỹ Thuật
+## 📌 Giới thiệu dự án
 
-Phân loại mã độc từ 470 đặc trưng hành vi động khi chuyển thành ảnh 2D thường gặp 2 thách thức lớn:
-- **Dữ liệu thưa (78% là số 0) & Ngoại lai cực đoan (có API gọi > 3.6 triệu lần):** Chuẩn hóa tuyến tính thông thường sẽ bóp nghẹt các tín hiệu kích hoạt nhỏ về 0.
-- **Vi phạm tương quan không gian (Spatial Locality):** Sắp xếp đặc trưng ngẫu nhiên khiến kernel tích chập $3\times3$ quét nhầm các hành vi rời rạc.
+Mã độc Android ngày càng tinh vi và sử dụng nhiều kỹ thuật lẩn tránh. Thay vì chỉ phân tích tĩnh file APK (dễ bị obfuscation qua mặt), chúng ta thu thập **470 đặc trưng hành vi động**:
+- **139 Lời gọi hệ thống cốt lõi (Linux Kernel System Calls)**: `open`, `read`, `write`, `clone`, `futex`, `ioctl`...
+- **331 Đặc trưng hành vi tầng Android**: Mạng (Socket, HTTP, DNS), Quyền hạn nhạy cảm (GPS, Danh bạ, Camera), Phần cứng (SMS, Phone, Wifi), Mã hóa (Crypto/Cipher), Tiến trình và Các thành phần Android (Intent, Service, Receiver).
 
-### 🌟 Hai giải pháp cốt lõi:
-1. **Log-Transform Scaling:** Áp dụng $\log(1+x)$ trước Min-Max, cân bằng độ tương phản cho bức ảnh và phục hồi các vân tay kích hoạt.
-2. **Semantic-Spatial Matrix Layout:** Gom cụm trọn vẹn **139 lời gọi kernel Linux (`syscall_unique.csv`)** đặt vào **7 hàng đầu tiên (pixel 0–138)** của ma trận $22\times22$, sau đó sắp xếp 8 nhóm hành vi Android Framework (Network, Privacy, Device, Crypto...). Giúp CNN tăng vọt từ **86.21% lên 90.98%**.
+Thử thách đặt ra là: **Làm sao để đưa dữ liệu dạng bảng (tabular data) vào mạng nơ-ron (CNN) vốn được thiết kế cho xử lý ảnh, mà vẫn giữ được độ chính xác cạnh tranh với các mô hình cây quyết định (Tree-based) như Random Forest?**
 
----
-
-## 📊 2. Bảng So Sánh Hiệu Năng (Test Set: 1,729 mẫu độc lập)
-
-| Mô hình | Định dạng đầu vào | Accuracy (%) | Macro F1 (%) | Weighted F1 (%) | ROC-AUC | Vai trò trong đề tài |
-|---|---|:---:|:---:|:---:|:---:|---|
-| **Baseline CNN (Thô)** | Ảnh 22×22 ngẫu nhiên, MinMax | 86.21% | 84.26% | 86.35% | 0.9748 | Mô hình cơ sở ban đầu |
-| **MLP (1D Nơ-ron)** | Vector 470 + MinMax | 92.54% | 91.12% | 92.65% | 0.9852 | Mạng nơ-ron kết nối đầy đủ |
-| **Random Forest** | Vector 470 + Log1p | 95.08% | 94.19% | 95.12% | 0.9930 | Đối chuẩn cây độc lập (Bagging) |
-| **MalwareCNN (Đề xuất)** | **Ảnh 22×22: 139 Syscall + Log1p** | **90.98%** | **89.10%** | **91.28%** | **0.9914** | 🌟 **Mô hình CNN trọng tâm của đề tài** |
-| **HistGradientBoosting** | **Bảng sạch + Kỹ thuật đặc trưng** | **95.66%** | **94.75%** | **95.68%** | **0.9961** | 🏆 **Mốc đối chuẩn SOTA dạng bảng** |
+Nhóm giải quyết bài toán này bằng kiến trúc **Hybrid CNN + 1D MLP**: kết hợp ảnh 2D ngữ nghĩa (xử lý qua CNN) và vector đặc trưng toàn cục (xử lý qua MLP).
 
 ---
 
-## 🎯 3. Chi Tiết Hiệu Năng Theo Từng Họ Mã Độc
+## 🚀 Các Cải Tiến Kỹ Thuật
 
-| Họ mã độc (Class) | MalwareCNN (22×22) F1 | HistGradientBoosting F1 | Đánh giá an ninh thực tế |
-|---|:---:|:---:|---|
-| **SMS Malware** | **97.87%** | **98.80%** | Bắt trọn gần 100% mã độc đánh cắp tin nhắn & mã OTP |
-| **Banking Trojan** | **92.36%** | **94.55%** | Nhận diện chuẩn xác mã độc ngân hàng & lừa đảo tài chính |
-| **Benign (Sạch)** | **89.69%** | **95.40%** | Tỷ lệ báo động giả (False Positive) rất thấp |
-| **Riskware** | **88.31%** | **94.64%** | Phân loại chuẩn xác phần mềm tiềm ẩn nguy hiểm |
-| **Adware** | **77.25%** | **90.36%** | Recall cao, không bỏ sót mã độc quảng cáo |
+Để mô hình CNN có thể học tốt trên dữ liệu bảng, nhóm áp dụng các kỹ thuật sau:
+
+1. **Gom nhóm ngữ nghĩa (Semantic Grouping) & Căn hàng ma trận 24x24**:
+   - Dùng Regex tokenization chia 470 đặc trưng vào 10 nhóm chức năng (SystemCall, Network, Privacy, Device, Crypto, Process, Android_Component, App_Management, FileSystem, Other_API).
+   - Mỗi nhóm bắt đầu ở một hàng mới trên ma trận 24x24 (tổng 576 ô, vừa vặn 24 hàng). Phần dư ở cuối hàng được đệm số 0 (Zero-padding) để bộ lọc tích chập (Kernel 3x3) không quét nhầm giữa 2 nhóm ngữ nghĩa khác nhau.
+
+2. **Sắp xếp theo Mutual Information (Thông tin tương hỗ)**:
+   - Thay vì dùng hệ số tương quan tuyến tính Pearson (vốn giả định nhãn là số liên tục, không hợp lý với nhãn phân loại 5 lớp), nhóm sử dụng `mutual_info_classif` để đo lường mức độ liên quan phi tuyến giữa từng đặc trưng với nhãn mã độc. Trong mỗi nhóm ngữ nghĩa, đặc trưng có điểm Mutual Information cao hơn sẽ được xếp trước.
+
+3. **Biểu diễn ảnh đa kênh (3-Channel Image)**:
+   - **Kênh 1 (Cường độ)**: Log-transform `log(1+x)` kết hợp Min-Max Scaling (nén các giá trị gọi hàng triệu lần, cứu các tín hiệu nhỏ).
+   - **Kênh 2 (Nhị phân)**: Cờ Có/Không kích hoạt (0/1), mô phỏng cơ chế rẽ nhánh của cây quyết định.
+   - **Kênh 3 (Chuẩn hóa nội bộ mẫu)**: Sample-wise Normalization (chia cho giá trị max của chính mẫu đó).
+
+4. **Giữ thông tin vị trí không gian (Spatial Awareness)**:
+   - Không sử dụng Global Average Pooling (GAP) vì GAP nén toàn bộ ma trận về 1x1 làm mất thông tin vị trí các hàng ngữ nghĩa.
+   - Thay bằng `AdaptiveAvgPool2d((3, 3))` và bổ sung module `CoordConv` (ghép thêm 2 kênh tọa độ X, Y vào ảnh).
+
+5. **Kiến trúc Hybrid song song (CNN 2D + 1D MLP)**:
+   - Nhánh CNN khai thác các mối tương quan cục bộ trong ma trận 2D.
+   - Nhánh MLP (2 lớp Linear + BatchNorm + Dropout) tiếp nhận trực tiếp vector 470 đặc trưng gốc để bù đắp các liên kết toàn cục mà cửa sổ tích chập 3x3 bỏ sót. Hai luồng được ghép (concatenate) trước khi đưa vào Classifier 5 lớp.
+
+6. **Huấn luyện cân bằng & Chống Overfitting**:
+   - Dọn sạch các mẫu xung đột (cùng vector đặc trưng nhưng khác nhãn) để tránh data leakage.
+   - Áp dụng Class Weight (căn bậc 2) kết hợp Label Smoothing 0.1 và chu kỳ học `OneCycleLR`. Lưu checkpoint theo **Macro-F1** trên tập Validation.
 
 ---
 
-## 📂 4. Cấu Trúc Thư Mục Dự Án
+## 📂 Cấu trúc thư mục
 
 ```text
-d:\IE105\
-├── .gitignore                      # Chặn file > 100MB (50k sample) & cache Python
-├── README.md                       # Tài liệu đồ án
-│
-├── dataset/                        # Dữ liệu nguồn
-│   └── CSV/
-│       ├── 50000_extracted features.csv  # Dữ liệu lớn CICMalDroid2020 (ignored git)
-│       ├── 471_extracted features.csv    # Dữ liệu chuẩn 470 đặc trưng + nhãn Class
-│       ├── 139_extracted features.csv    # Tập đặc trưng rút gọn 139
-│       └── syscall_unique.csv            # Danh mục 139 lời gọi hệ thống kernel Linux
-│
-└── Main/                           # Toàn bộ mã nguồn & Model Checkpoints
-    ├── 471_extracted features.csv  # Dữ liệu thực nghiệm chính
-    ├── syscall_unique.csv          # Danh mục 139 syscall kernel
-    ├── GHI_CHU_DO_AN.md            # Sổ tay bảo vệ đồ án & câu hỏi phản biện
-    │
-    ├── [Nhánh 1: MalwareCNN 22×22 (Trọng tâm đề tài)]
-    │   ├── feature_to_image.py     # Biến đổi vector -> ma trận 22x22 (139 syscall + log1p)
-    │   ├── images_22x22.npz        # File nén dữ liệu ảnh train/val/test (70/15/15)
-    │   ├── scaler.joblib           # MinMaxScaler fit trên tập train
-    │   ├── cnn_model.py            # Mạng PyTorch MalwareCNN (Conv2D, BatchNorm, Dropout)
-    │   ├── best_model.pth          # Checkpoint trọng số CNN tốt nhất (90.98%)
-    │   ├── evaluation.py           # Đánh giá & kết xuất đồ thị CNN (Confusion Matrix, ROC)
-    │   ├── error_analysis.py       # Phân tích ca sai, độ tự tin và attribution
-    │   ├── predict.py              # Dự đoán mã độc từ file CSV & chế độ Demo
-    │   ├── visualize_samples.py    # Vẽ bản đồ nhiệt trực quan hóa ảnh 22x22
-    │   └── evaluation/             # 17 báo cáo và đồ thị kết quả của CNN
-    │
-    └── [Nhánh 2: HistGradientBoosting (Đối chuẩn SOTA)]
-        ├── data_pipeline.py        # Pipeline làm sạch và tạo 4 nhóm đặc trưng cấp cao
-        ├── train_hgb.py            # Huấn luyện HistGradientBoosting (95.66%)
-        ├── best_hgb_model.joblib   # Trọng số mô hình Boosting
-        ├── pipeline.joblib         # Bộ trích chọn đặc trưng đã fit
-        ├── test_data.npz           # Dữ liệu test chuẩn 1,729 mẫu của HGB
-        ├── evaluate_hgb.py         # Đánh giá Boosting & xuất biểu đồ
-        ├── predict_hgb.py          # Dự đoán & demo cho Boosting
-        └── evaluation_hgb/         # Báo cáo đánh giá và biểu đồ của Boosting
+IE105
+├── Common_Data/
+│   ├── 471_extracted features.csv   # Dữ liệu gốc 470 đặc trưng + 1 cột nhãn Class
+│   ├── syscall_unique.csv           # Danh sách 139 System Calls
+│   └── data_loader.py               # Làm sạch, chia Train/Val/Test (70/15/15) chung
+├── CNN_Model/
+│   ├── preprocess.py                # Pipeline biến đổi Vector -> Tensor ảnh 24x24
+│   ├── cnn_train.py                 # Huấn luyện mô hình Hybrid / CNN / MLP
+│   ├── predict_cnn.py               # Script dự đoán độc lập file CSV mới
+│   ├── test_grouping.py             # Script kiểm tra căn hàng ma trận ngữ nghĩa
+│   ├── cnn_best_model.pth           # Trọng số mô hình tốt nhất
+│   └── cnn_pipeline.joblib          # Pipeline ánh xạ đặc trưng đã fit trên Train
+├── RandomForest_Baseline/
+│   ├── rf_train.py                  # Huấn luyện mô hình đối chuẩn Random Forest
+│   └── rf_baseline_model.joblib     # File mô hình Random Forest
+├── run_ablation.py                  # Script chạy thử nghiệm Ablation Study (5 seeds)
+├── ablation_results.csv             # Kết quả chi tiết các lần chạy ablation
+├── cnn_log.txt                      # Log kết quả huấn luyện mô hình Hybrid CNN
+├── rf_log.txt                       # Log kết quả huấn luyện mô hình Random Forest
+└── README.md
 ```
 
 ---
 
-## 🚀 5. Hướng Dẫn Chạy Nhanh (Cheat Sheet)
+## 🧠 Hướng dẫn sử dụng
 
-Chuyển vào thư mục `Main/` để thực thi:
+### 1. Cài đặt môi trường
+Cần Python 3.9+ và các thư viện trong danh sách sau:
 ```bash
-cd Main
+pip install pandas numpy scikit-learn torch joblib
 ```
 
-### Chạy Demo dự đoán thử nghiệm
+### 2. Huấn luyện Random Forest (Baseline)
 ```bash
-# Demo với mô hình CNN (10 mẫu ngẫu nhiên từ Test set):
-python predict.py --demo
+python RandomForest_Baseline/rf_train.py
+```
+*(Chạy mất khoảng 5-10 giây trên CPU, lưu model tại `RandomForest_Baseline/rf_baseline_model.joblib`).*
 
-# Demo với mô hình Boosting SOTA (95.66%):
-python predict_hgb.py --demo
+### 3. Huấn luyện mạng Hybrid CNN
+```bash
+python CNN_Model/cnn_train.py
+```
+*(Chạy khoảng 4-5 phút trên CPU, lưu checkpoint và pipeline tại thư mục `CNN_Model/`).*
 
-# Dự đoán file CSV mới bất kỳ:
-python predict.py --input sample.csv --topk 3
+### 4. Chạy kiểm nghiệm Ablation Study
+Để kiểm chứng đóng góp của từng thành phần (CNN-only, MLP-only, Hybrid, Random Forest) qua 5 seed ngẫu nhiên:
+```bash
+python run_ablation.py
+```
+Kết quả từng lượt chạy sẽ được tự động lưu vào `ablation_results.csv`.
+
+### 5. Dự đoán trên tập dữ liệu mới
+Công cụ dự đoán độc lập, tự động căn chỉnh và xử lý cột thiếu:
+```bash
+python CNN_Model/predict_cnn.py --input "Common_Data/471_extracted features.csv" --show 10
 ```
 
-### Xem biểu đồ đánh giá & phân tích sai số
-```bash
-# Đánh giá CNN (xuất Confusion Matrix, ROC-AUC vào evaluation/):
-python evaluation.py
+---
 
-# Phân tích sai số chuyên sâu của CNN:
-python error_analysis.py
+## 📊 Kết quả thực nghiệm
 
-# Trực quan hóa ảnh 22x22 và bản đồ nhiệt:
-python visualize_samples.py
+Đánh giá trên tập kiểm thử độc lập (**Test Set: 1,728 mẫu** hoàn toàn chưa từng xuất hiện trong quá trình huấn luyện và chọn siêu tham số):
 
-# Đánh giá mô hình Boosting:
-python evaluate_hgb.py
+### 1. Kết quả kiểm nghiệm Ablation Study (Đánh giá qua 5 Seeds ngẫu nhiên)
+
+Bảng tổng hợp thực nghiệm đa seed (`[42, 43, 44, 45, 46]`) nhằm loại bỏ yếu tố may rủi, phản ánh chính xác hiệu năng mô hình (báo cáo Mean ± Std):
+
+| Mô hình | Số Seeds | Test Accuracy (%) | Test Macro F1 | Thời gian train TB (CPU) | Điểm nổi bật |
+|---|:---:|:---:|:---:|:---:|---|
+| **Random Forest (Baseline)** | 5 | **95.90 ± 0.08** | **0.9515 ± 0.0011** | ~0.6s | Độ ổn định gần như tuyệt đối, cực kỳ mạnh trên bảng rời rạc |
+| **Hybrid CNN + MLP** | 5 | **95.64 ± 0.32** | **0.9475 ± 0.0036** | ~280s | Kết hợp đa kênh và vector 1D, tiệm cận sát mốc của Random Forest |
+| **MLP-only (1D Vector)** | 5 | **95.68 ± 0.37** | **0.9480 ± 0.0040** | ~26s | Xử lý nhanh, khai thác triệt để tương quan toàn cục của vector 470 |
+| **CNN-only (2D Image)** | 5 | **95.36 ± 0.18** | **0.9449 ± 0.0021** | ~275s | Độ lệch chuẩn nhỏ (±0.18%), chứng minh ma trận 24x24 học rất ổn định |
+
+*(Toàn bộ log chi tiết từng seed được lưu tại file `ablation_results.csv`).*
+
+### 2. Chi tiết theo từng lớp mã độc (Mô hình Hybrid CNN - Seed 42)
+
+```text
+              precision    recall  f1-score   support
+      Adware     0.8683    0.9468    0.9059       188
+     Banking     0.9754    0.9085    0.9408       306
+ SMS Malware     0.9798    0.9932    0.9864       585
+    Riskware     0.9558    0.9105    0.9326       380
+      Benign     0.9187    0.9665    0.9420       269
+    accuracy                         0.9508      1728
+   macro avg     0.9396    0.9451    0.9415      1728
 ```
 
-### Huấn luyện lại từ đầu (Nếu cần)
-```bash
-# Huấn luyện CNN:
-python feature_to_image.py
-python cnn_model.py
+---
 
-# Huấn luyện Boosting:
-python train_hgb.py
-```
+## 💡 Nhận xét & Đánh giá khoa học
+
+1. **Về bản chất dữ liệu**: Dữ liệu hành vi mã độc dạng bảng có cấu trúc rời rạc, tính thưa cao (nhiều giá trị 0) và các ranh giới quyết định trực giao. Đây là môi trường sở trường của các thuật toán họ Cây (Random Forest, Gradient Boosting).
+2. **Hiệu quả của việc biến đổi ảnh**: Việc sắp xếp đặc trưng theo nhóm ngữ nghĩa và căn hàng 24x24 kết hợp tính điểm bằng Mutual Information đã giúp CNN đạt **95.25%** độc lập, vượt xa mức 86% ban đầu khi xếp pixel ngẫu nhiên.
+3. **Ý nghĩa của kiến trúc lai (Hybrid)**: Nhánh MLP 1D xử lý nhanh và trực tiếp vector đặc trưng toàn cục, trong khi nhánh CNN giúp phát hiện các mẫu vân tay hành vi đồng xuất hiện trong cùng một nhóm ngữ nghĩa. Việc kết hợp cả hai giúp mô hình bao quát tốt hơn ở các lớp khó như Adware và Benign.
