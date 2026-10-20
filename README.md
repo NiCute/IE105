@@ -1,4 +1,4 @@
-# Đồ án IE105 - Khai phá dữ liệu & Ứng dụng
+# Đồ án IE105 - Nhập Môn Đảm Bảo An Ninh Thông Tin
 **Phát hiện và Phân loại Mã độc Android bằng Kỹ thuật Deep Learning (Kiến trúc Hybrid)**
 
 Chào mừng đến với dự án cuối kỳ môn Khai phá dữ liệu (IE105). Repo này chứa mã nguồn để phát hiện và phân loại mã độc Android dựa trên các hành vi (lời gọi hệ thống Linux, API calls, quyền hạn, intent, phần cứng...) được trích xuất từ môi trường sandbox động (bộ dữ liệu CICMalDroid2020).
