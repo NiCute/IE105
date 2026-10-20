@@ -157,6 +157,7 @@ class FeatureToImagePipeline:
 
         # B4: xếp vào ảnh, mỗi nhóm bắt đầu từ đầu 1 hàng mới
         self.pixel_mapping = []
+        self.group_layout = {}  # reset luôn, lỡ gọi fit 2 lần thì không bị dính layout cũ
         current_row = 0
 
         for g in SEMANTIC_GROUPS_ORDER:

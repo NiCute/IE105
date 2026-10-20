@@ -23,7 +23,8 @@ Nhóm giải quyết bài toán này bằng kiến trúc **Hybrid CNN + 1D MLP**
 
 1. **Gom nhóm ngữ nghĩa (Semantic Grouping) & Căn hàng ma trận 24x24**:
    - Dùng Regex tokenization chia 470 đặc trưng vào 10 nhóm chức năng (SystemCall, Network, Privacy, Device, Crypto, Process, Android_Component, App_Management, FileSystem, Other_API).
-   - Mỗi nhóm bắt đầu ở một hàng mới trên ma trận 24x24 (tổng 576 ô, vừa vặn 24 hàng). Phần dư ở cuối hàng được đệm số 0 (Zero-padding) để bộ lọc tích chập (Kernel 3x3) không quét nhầm giữa 2 nhóm ngữ nghĩa khác nhau.
+   - Mỗi nhóm bắt đầu ở một hàng mới trên ma trận 24x24 (tổng 576 ô, dùng 23/24 hàng). Phần dư ở cuối hàng được đệm số 0 (Zero-padding) để một hàng không chứa feature của 2 nhóm khác nhau.
+   - *Lưu ý:* việc này chỉ tránh trộn nhóm **theo chiều ngang**. Kernel 3x3 phủ 3 hàng liền nhau nên ở ranh giới giữa 2 nhóm vẫn quét lẫn **theo chiều dọc** (không đủ hàng trống để chèn hàng phân cách giữa 10 nhóm). Ngoài ra nhóm `Other_API` vẫn chiếm 152/470 feature do bộ từ khóa chưa phủ hết.
 
 2. **Sắp xếp theo Mutual Information (Thông tin tương hỗ)**:
    - Thay vì dùng hệ số tương quan tuyến tính Pearson (vốn giả định nhãn là số liên tục, không hợp lý với nhãn phân loại 5 lớp), nhóm sử dụng `mutual_info_classif` để đo lường mức độ liên quan phi tuyến giữa từng đặc trưng với nhãn mã độc. Trong mỗi nhóm ngữ nghĩa, đặc trưng có điểm Mutual Information cao hơn sẽ được xếp trước.
@@ -42,7 +43,7 @@ Nhóm giải quyết bài toán này bằng kiến trúc **Hybrid CNN + 1D MLP**
    - Nhánh MLP (2 lớp Linear + BatchNorm + Dropout) tiếp nhận trực tiếp vector 470 đặc trưng gốc để bù đắp các liên kết toàn cục mà cửa sổ tích chập 3x3 bỏ sót. Hai luồng được ghép (concatenate) trước khi đưa vào Classifier 5 lớp.
 
 6. **Huấn luyện cân bằng & Chống Overfitting**:
-   - Dọn sạch các mẫu xung đột (cùng vector đặc trưng nhưng khác nhãn) để tránh data leakage.
+   - Loại bỏ mẫu trùng lặp hoàn toàn **trước khi chia tập** (tránh cùng 1 mẫu vừa nằm ở Train vừa nằm ở Test → data leakage) và loại bỏ mẫu xung đột (cùng vector đặc trưng nhưng khác nhãn → nhiễu nhãn). Tổng cộng bỏ 80/11,598 mẫu.
    - Áp dụng Class Weight (căn bậc 2) kết hợp Label Smoothing 0.1 và chu kỳ học `OneCycleLR`. Lưu checkpoint theo **Macro-F1** trên tập Validation.
 
 ---
@@ -106,6 +107,7 @@ Công cụ dự đoán độc lập, tự động căn chỉnh và xử lý cộ
 ```bash
 python CNN_Model/predict_cnn.py --input "Common_Data/471_extracted features.csv" --show 10
 ```
+*(Lưu ý: file 471 gốc chứa cả dữ liệu Train nên accuracy in ra ở lệnh trên sẽ cao hơn thực tế, chỉ dùng để demo. Con số đánh giá chính thức là trên tập Test bên dưới. Cột nhãn kiểu số 1..5, 0..4 hoặc tên lớp đều đọc được.)*
 
 ---
 
@@ -115,7 +117,8 @@ python CNN_Model/predict_cnn.py --input "Common_Data/471_extracted features.csv"
 
 ### 1. Kết quả kiểm nghiệm Ablation Study (Đánh giá qua 5 Seeds ngẫu nhiên)
 
-Bảng tổng hợp thực nghiệm đa seed (`[42, 43, 44, 45, 46]`) nhằm loại bỏ yếu tố may rủi, phản ánh chính xác hiệu năng mô hình (báo cáo Mean ± Std):
+Bảng tổng hợp thực nghiệm đa seed (`[42, 43, 44, 45, 46]`) nhằm loại bỏ yếu tố may rủi, phản ánh chính xác hiệu năng mô hình (báo cáo Mean ± Std).
+*Lưu ý: seed chỉ thay đổi khởi tạo trọng số / thứ tự shuffle (RF: bootstrap), còn cách chia Train/Val/Test cố định `random_state=42` nên Std chưa phản ánh dao động do chia dữ liệu.*
 
 | Mô hình | Số Seeds | Test Accuracy (%) | Test Macro F1 | Thời gian train TB (CPU) | Điểm nổi bật |
 |---|:---:|:---:|:---:|:---:|---|
@@ -126,7 +129,7 @@ Bảng tổng hợp thực nghiệm đa seed (`[42, 43, 44, 45, 46]`) nhằm lo�
 
 *(Toàn bộ log chi tiết từng seed được lưu tại file `ablation_results.csv`).*
 
-### 2. Chi tiết theo từng lớp mã độc (Mô hình Hybrid CNN - Seed 42)
+### 2. Chi tiết theo từng lớp mã độc (Mô hình Hybrid CNN - Seed 42, đây là seed thấp nhất của Hybrid)
 
 ```text
               precision    recall  f1-score   support
@@ -144,5 +147,5 @@ Bảng tổng hợp thực nghiệm đa seed (`[42, 43, 44, 45, 46]`) nhằm lo�
 ## 💡 Nhận xét & Đánh giá khoa học
 
 1. **Về bản chất dữ liệu**: Dữ liệu hành vi mã độc dạng bảng có cấu trúc rời rạc, tính thưa cao (nhiều giá trị 0) và các ranh giới quyết định trực giao. Đây là môi trường sở trường của các thuật toán họ Cây (Random Forest, Gradient Boosting).
-2. **Hiệu quả của việc biến đổi ảnh**: Việc sắp xếp đặc trưng theo nhóm ngữ nghĩa và căn hàng 24x24 kết hợp tính điểm bằng Mutual Information đã giúp CNN đạt **95.25%** độc lập, vượt xa mức 86% ban đầu khi xếp pixel ngẫu nhiên.
-3. **Ý nghĩa của kiến trúc lai (Hybrid)**: Nhánh MLP 1D xử lý nhanh và trực tiếp vector đặc trưng toàn cục, trong khi nhánh CNN giúp phát hiện các mẫu vân tay hành vi đồng xuất hiện trong cùng một nhóm ngữ nghĩa. Việc kết hợp cả hai giúp mô hình bao quát tốt hơn ở các lớp khó như Adware và Benign.
+2. **Hiệu quả của việc biến đổi ảnh**: Việc sắp xếp đặc trưng theo nhóm ngữ nghĩa và căn hàng 24x24 kết hợp tính điểm bằng Mutual Information đã giúp CNN đạt **95.36%** (trung bình 5 seed) độc lập, vượt xa mức 86% ban đầu khi xếp pixel ngẫu nhiên (lưu ý: bản 86% dùng bộ dữ liệu/tiền xử lý cũ nên không hoàn toàn cùng điều kiện).
+3. **Ý nghĩa của kiến trúc lai (Hybrid)**: Kết quả ablation cho thấy **MLP-only (95.68 ± 0.37) và Hybrid (95.64 ± 0.32) gần như bằng nhau**, chênh lệch nhỏ hơn nhiều so với độ lệch chuẩn → chưa có bằng chứng nhánh CNN đóng góp thêm thông tin so với vector 1D. Cách giải thích hợp lý: hai ô kề nhau trên ảnh chỉ là 2 feature có điểm MI gần nhau, không nhất thiết có quan hệ với nhau như pixel ảnh thật, nên tính "cục bộ không gian" mà CNN khai thác khá yếu. Random Forest vẫn tốt nhất cả về độ chính xác, độ ổn định và thời gian train.

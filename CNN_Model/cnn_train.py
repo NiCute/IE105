@@ -298,9 +298,12 @@ def train_mot_lan(data, mode="hybrid", seed=42, save_path=None, in_tung_epoch=Tr
 
     # label_smoothing để model đỡ "tự tin thái quá"
     criterion = nn.CrossEntropyLoss(weight=class_weights.to(DEVICE), label_smoothing=0.1)
-    optimizer = optim.AdamW(model.parameters(), lr=2e-3, weight_decay=1e-4)
+    # trước có ghi lr=2e-3 ở đây nhưng thật ra vô nghĩa: OneCycleLR sẽ ghi đè lr ngay khi khởi tạo
+    # (bắt đầu từ max_lr / 25 = 2e-4) -> bỏ đi cho khỏi hiểu nhầm, kết quả train không đổi
+    optimizer = optim.AdamW(model.parameters(), weight_decay=1e-4)
 
     # OneCycleLR: lr tăng dần lên max_lr rồi giảm dần về cuối
+    # lưu ý: kết hợp với EarlyStopping thì nếu dừng sớm, lr chưa kịp giảm hết về cuối chu kỳ
     scheduler = optim.lr_scheduler.OneCycleLR(
         optimizer, max_lr=5e-3, steps_per_epoch=len(train_loader), epochs=EPOCHS
     )

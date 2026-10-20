@@ -59,8 +59,11 @@ def load_pipeline():
 def load_model(n_features):
     if not MODEL_PATH.exists():
         raise FileNotFoundError(f"Không thấy file model: {MODEL_PATH}")
-    model = HybridMalwareModel(n_features=n_features, n_classes=5).to(DEVICE)
     ckpt = torch.load(MODEL_PATH, map_location=DEVICE, weights_only=True)
+    # lúc train có lưu "mode" vào checkpoint rồi, đọc ra luôn chứ không fix cứng "hybrid"
+    # (lỡ ai copy model_cnn.pth đè lên thì load_state_dict sẽ báo lỗi thiếu key rất khó hiểu)
+    mode = ckpt.get("mode", "hybrid")
+    model = HybridMalwareModel(n_features=n_features, n_classes=5, mode=mode).to(DEVICE)
     model.load_state_dict(ckpt["model_state"])
     model.eval()
     return model
@@ -69,6 +72,28 @@ def load_model(n_features):
 def parse_labels(raw_labels):
     # cột nhãn trong file test có thể là số (1-5 hoặc 0-4) hoặc là chữ
     # nên phải xử lý hết mấy trường hợp, cái nào không hiểu thì để -1
+    #
+    # BUG bản cũ: xét từng giá trị riêng lẻ, thấy 1..5 là trừ 1 luôn.
+    # => file dùng nhãn 0..4 thì số 1 (Banking) bị đọc thành 0 (Adware), 2 -> 1,... lệch hết,
+    #    chỉ có số 0 là đúng. Accuracy in ra sẽ sai bét mà không báo lỗi gì.
+    # Sửa: phải nhìn CẢ CỘT mới biết file đang dùng kiểu nào.
+    so = pd.to_numeric(pd.Series(raw_labels), errors="coerce")
+    if so.notna().all():
+        so = so.astype(int).values
+        if so.min() == 0:
+            # có số 0 -> chắc chắn là kiểu 0..4, giữ nguyên
+            print("[NHÃN] Nhận diện cột nhãn kiểu số 0..4")
+            ket_qua = so
+        else:
+            # không có số 0 -> coi là kiểu 1..5 giống file gốc CICMalDroid
+            # (trường hợp file 0..4 mà không có mẫu Adware nào thì không phân biệt được, đành chịu)
+            print("[NHÃN] Nhận diện cột nhãn kiểu số 1..5 (sẽ trừ 1)")
+            ket_qua = so - 1
+        # số nằm ngoài khoảng thì coi như không hiểu
+        ket_qua = np.where((ket_qua >= 0) & (ket_qua < len(CLASS_NAMES)), ket_qua, -1)
+        return ket_qua.astype(int)
+
+    # không phải số hết thì đọc kiểu chữ
     name_to_idx = {
         "adware": 0,
         "banking": 1, "banking malware": 1,
@@ -78,20 +103,6 @@ def parse_labels(raw_labels):
     }
     result = []
     for val in raw_labels:
-        # thử đọc kiểu số trước
-        try:
-            num = int(float(val))
-            if 1 <= num <= 5:
-                result.append(num - 1)
-                continue
-            elif num == 0:
-                # 1-5 đã bắt ở trên rồi nên tới đây chỉ còn số 0 là hợp lệ
-                result.append(num)
-                continue
-        except (ValueError, TypeError):
-            pass
-
-        # không phải số thì đọc kiểu chữ
         s = str(val).strip().lower()
         if s in name_to_idx:
             result.append(name_to_idx[s])
